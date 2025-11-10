@@ -153,15 +153,35 @@ def beep():
         sd.play(tone, 44100)
         sd.wait()
 
-def detect_voice(vad, q):
-    """Wait until speech is detected."""
+def detect_voice(vad, q, sample_rate=16000, frame_size=160, min_speech_ms=250, pre_beep_delay=0.3):
+    """
+    Wait until sustained speech is detected before triggering.
+    - min_speech_ms: minimum duration of continuous speech to confirm (ms)
+    - pre_beep_delay: pause before beeping, so user has time to get ready
+    """
+    speech_start = None
+    frame_duration = frame_size / sample_rate  # seconds per frame
+
+    print("[VAD] Listening for voice...")
+
     while True:
-        audio = sd.rec(FRAME_SIZE, samplerate=SAMPLE_RATE, channels=1, dtype="int16")
+        # Capture a short frame of audio
+        audio = sd.rec(frame_size, samplerate=sample_rate, channels=1, dtype="int16")
         sd.wait()
-        is_speech = vad.is_speech(audio.tobytes(), SAMPLE_RATE)
+
+        is_speech = vad.is_speech(audio.tobytes(), sample_rate)
+
         if is_speech:
-            q.put(audio.copy())
-            return
+            if speech_start is None:
+                speech_start = time.time()
+            elif (time.time() - speech_start) * 1000 >= min_speech_ms:
+                # Sustained speech confirmed
+                print("[VAD] Sustained voice detected")
+                time.sleep(pre_beep_delay)  # allow short pause before beep
+                q.put(audio.copy())
+                return
+        else:
+            speech_start = None  # reset if silence
 
 def record_until_silence(vad, q):
     """Record voice until silence detected."""
@@ -190,17 +210,18 @@ def record_until_silence(vad, q):
     return data
 
 def run_session():
-    vad = webrtcvad.Vad(2)
+    vad = webrtcvad.Vad(3)
     q = queue.Queue()
     print("Listening for speech...")
 
     detect_voice(vad, q)
     beep()
+    time.sleep(0.5)
     print("Recording...")
     audio_data = record_until_silence(vad, q)
 
     # STT placeholder: integrate with Whisper/Vosk later
-    print("Performing STT (placeholder)...")
+    print("Performing STT...")
     prompt_text = transcribe_audio(audio_data, SAMPLE_RATE)
     print(f"Prompt: {prompt_text}")
 
