@@ -166,4 +166,5 @@ torch==2.8.0
 tqdm==4.67.1
 typing_extensions==4.14.1
 urllib3==2.5.0
-webrtcvad==2.0.10
+webrtcvad_wheels==2.0.14; sys_platform == "Windows"
+webrtcvad==2.0.10; sys_platform == "Darwin"

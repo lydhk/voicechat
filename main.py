@@ -9,6 +9,10 @@ import os #import os library for load_context
 import winsound #import winsound library for beep on Windows
 import numpy as np #import numpy library for beep on non-Windows
 import time #import time library for record_until_silence
+try:
+    import webrtcvad
+except ImportError:
+    import webrtcvad_wheels as webrtcvad
 import webrtcvad #import webrtcvad library for voice activity detection, 'pip install webrtcvad'
 import json #import json library for ollama_respond
 import queue #import queue library for detect_voice and record_until_silence
