@@ -1,7 +1,7 @@
 import sounddevice as sd #import sounddevice library for record_audio, 'pip install sounddevice'
 import tempfile #import tempfile library for save_audio_to_wav
 import wave #import wave library for save_audio_to_wav
-import whisper #import whisper library for transcribe_audio, 'pip install openai-whisper'
+from faster_whisper import WhisperModel #import whisper library for transcribe_audio, 'pip install openai-whisper'
 import requests #import requests library for query_llm, 'pip install requests'
 import platform #import platform library for beep
 import pyttsx3 #import pyttsx3 library for speak, 'pip install pyttsx3'
@@ -28,6 +28,40 @@ FRAME_SIZE = int(SAMPLE_RATE * FRAME_DURATION / 1000)
 MAX_RECORD_SECONDS = 15
 SILENCE_THRESHOLD_FRAMES = int(0.8 * 1000 / FRAME_DURATION)  # 0.8 sec silence
 
+
+# Initialize Whisper model once (reused across calls)
+whisper_model = WhisperModel("base", device="cpu")
+
+
+def transcribe_audio(audio_data, sample_rate=16000):
+    """
+    Convert recorded audio (numpy array) to text using faster-whisper.
+    Lightweight version without SciPy.
+    """
+    tmp_path = None
+    try:
+        # Save to temporary WAV
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_wav:
+            tmp_path = tmp_wav.name
+        with wave.open(tmp_path, "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(sample_rate)
+            if audio_data.dtype != np.int16:
+                audio_data = (audio_data * 32767).astype(np.int16)
+            wf.writeframes(audio_data.tobytes())
+
+        # Transcribe with Whisper
+        segments, info = whisper_model.transcribe(tmp_path)
+        text = " ".join([seg.text for seg in segments]).strip()
+        print(f"[STT] {text}")
+        return text or "[unintelligible]"
+    except Exception as e:
+        print(f"[STT ERROR] {e}")
+        return ""
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
 # Load context from text file
 def load_context():
@@ -167,7 +201,7 @@ def run_session():
 
     # STT placeholder: integrate with Whisper/Vosk later
     print("Performing STT (placeholder)...")
-    prompt_text = "[voice captured]"  # Replace with real STT output
+    prompt_text = transcribe_audio(audio_data, SAMPLE_RATE)
     print(f"Prompt: {prompt_text}")
 
     print("Querying Ollama...")
