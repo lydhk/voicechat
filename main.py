@@ -34,8 +34,21 @@ SILENCE_THRESHOLD_FRAMES = int(0.8 * 1000 / FRAME_DURATION)  # 0.8 sec silence
 whisper_model = whisper.load_model("base")
 # whisper_model = WhisperModel("base", device="cpu")
 
+def save_audio_to_wav(audio, samplerate=16000):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
+        with wave.open(f.name, 'w') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(samplerate)
+            wf.writeframes(audio.tobytes())
+        return f.name
 
-def transcribe_audio(audio_data, sample_rate=16000):
+def transcribe_audio(file_path):
+    print("🗣️ Transcribing...")
+    result = whisper_model.transcribe(file_path) 
+    return result["text"]
+
+def transcribe_audio2(audio_data, sample_rate=16000):
     """
     Convert recorded audio (numpy array) to text using faster-whisper.
     Lightweight version without SciPy.
@@ -222,10 +235,14 @@ def run_session():
     print("Recording...")
     audio_data = record_until_silence(vad, q)
 
+    # trying old way
+    wav_path = save_audio_to_wav(audio_data) # Call save_audio_to_wav function to save the audio to a WAV file
+    prompt_text = transcribe_audio(wav_path) # Call transcribe_audio function to transcribe the audio file
+    
     # STT placeholder: integrate with Whisper/Vosk later
-    print("Performing STT...")
-    prompt_text = transcribe_audio(audio_data, SAMPLE_RATE)
-    print(f"Prompt: {prompt_text}")
+    #print("Performing STT...")
+    #prompt_text = transcribe_audio(audio_data, SAMPLE_RATE)
+    #print(f"Prompt: {prompt_text}")
 
     print("Querying Ollama...")
     answer = ollama_respond(prompt_text)
