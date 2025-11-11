@@ -1,7 +1,8 @@
 import sounddevice as sd #import sounddevice library for record_audio, 'pip install sounddevice'
 import tempfile #import tempfile library for save_audio_to_wav
 import wave #import wave library for save_audio_to_wav
-from faster_whisper import WhisperModel #import whisper library for transcribe_audio, 'pip install openai-whisper'
+# from faster_whisper import WhisperModel #import whisper library for transcribe_audio, 'pip install openai-whisper'
+import whisper #import whisper library for transcribe_audio, 'pip install openai-whisper'
 import requests #import requests library for query_llm, 'pip install requests'
 import platform #import platform library for beep
 import pyttsx3 #import pyttsx3 library for speak, 'pip install pyttsx3'
@@ -30,7 +31,8 @@ SILENCE_THRESHOLD_FRAMES = int(0.8 * 1000 / FRAME_DURATION)  # 0.8 sec silence
 
 
 # Initialize Whisper model once (reused across calls)
-whisper_model = WhisperModel("base", device="cpu")
+whisper_model = whisper.load_model("base")
+# whisper_model = WhisperModel("base", device="cpu")
 
 
 def transcribe_audio(audio_data, sample_rate=16000):
