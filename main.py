@@ -34,6 +34,12 @@ SILENCE_THRESHOLD_FRAMES = int(0.8 * 1000 / FRAME_DURATION)  # 0.8 sec silence
 whisper_model = whisper.load_model("base")
 # whisper_model = WhisperModel("base", device="cpu")
 
+def record_audio(duration=4.5, samplerate=16000):
+   print("🎙️ Listening...")
+   audio = sd.rec(int(samplerate * duration), samplerate=samplerate, channels=1, dtype='int16')
+   sd.wait()
+   return audio.flatten()
+
 def save_audio_to_wav(audio, samplerate=16000):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
         with wave.open(f.name, 'w') as wf:
@@ -233,7 +239,10 @@ def run_session():
     beep()
     time.sleep(0.5)
     print("Recording...")
-    audio_data = record_until_silence(vad, q)
+    # audio_data = record_until_silence(vad, q)
+
+    # trying old way
+    audio_data = record_audio() 
 
     # trying old way
     print("Processing audio...")
