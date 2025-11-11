@@ -236,13 +236,14 @@ def run_session():
     audio_data = record_until_silence(vad, q)
 
     # trying old way
+    print("Processing audio...")
     wav_path = save_audio_to_wav(audio_data) # Call save_audio_to_wav function to save the audio to a WAV file
     prompt_text = transcribe_audio(wav_path) # Call transcribe_audio function to transcribe the audio file
     
     # STT placeholder: integrate with Whisper/Vosk later
     #print("Performing STT...")
     #prompt_text = transcribe_audio(audio_data, SAMPLE_RATE)
-    #print(f"Prompt: {prompt_text}")
+    print(f"Prompt: {prompt_text}")
 
     print("Querying Ollama...")
     answer = ollama_respond(prompt_text)
