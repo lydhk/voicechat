@@ -17,7 +17,11 @@ except ImportError:
 import webrtcvad #import webrtcvad library for voice activity detection, 'pip install webrtcvad'
 import json #import json library for ollama_respond
 import queue #import queue library for detect_voice and record_until_silence
+import sys
+import io
 
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL_NAME = "qwen2.5:0.5b"
