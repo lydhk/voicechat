@@ -58,8 +58,10 @@ def save_audio_to_wav(audio, samplerate=16000):
 
 def transcribe_audio(file_path):
     print("🗣️ Transcribing...")
-    result = whisper_model.transcribe(file_path) 
-    return result["text"]
+    result = whisper_model.transcribe(file_path)
+    text = result["text"]
+    logging.info(f"[STT] {text}")
+    return text
 
 
 # Load context from text file
@@ -117,6 +119,8 @@ def ollama_respond(user_input: str) -> str:
     """Send grounded prompt + context to Ollama and return model response."""
     context = load_context()
     prompt = build_prompt(context, user_input)
+    
+    logging.info(f"[PROMPT] {prompt}")
 
     payload = {"model": MODEL_NAME, "prompt": prompt}
     try:
@@ -128,8 +132,12 @@ def ollama_respond(user_input: str) -> str:
                 data = json.loads(line.decode("utf-8"))
                 if "response" in data:
                     full_text += data["response"]
-        return full_text.strip()
+        
+        response_text = full_text.strip()
+        logging.info(f"[LLM RESPONSE] {response_text}")
+        return response_text
     except Exception as e:
+        logging.error(f"[ERROR] Ollama request failed: {e}")
         print(f"[ERROR] Ollama request failed: {e}")
         return "Sorry, there was an error contacting the language model."
 
