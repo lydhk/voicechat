@@ -244,6 +244,11 @@ def run_session():
     
     print(f"Prompt: {prompt_text}")
 
+    if not prompt_text or not prompt_text.strip():
+        print("No speech detected. Skipping LLM query.")
+        logging.info("[STT] Empty input, skipping.")
+        return
+
     print("Querying Ollama...")
     answer = ollama_respond(prompt_text)
     print(f"Ollama response: {answer}")
