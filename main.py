@@ -19,6 +19,7 @@ import json #import json library for ollama_respond
 import queue #import queue library for detect_voice and record_until_silence
 import sys
 import io
+import logging
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
@@ -33,16 +34,18 @@ FRAME_SIZE = int(SAMPLE_RATE * FRAME_DURATION / 1000)
 MAX_RECORD_SECONDS = 15
 SILENCE_THRESHOLD_FRAMES = int(0.8 * 1000 / FRAME_DURATION)  # 0.8 sec silence
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("openmic.log"),
+        logging.StreamHandler()
+    ]
+)
 
 # Initialize Whisper model once (reused across calls)
 whisper_model = whisper.load_model("base")
 # whisper_model = WhisperModel("base", device="cpu")
-
-def record_audio(duration=4.5, samplerate=16000):
-   print("🎙️ Listening...")
-   audio = sd.rec(int(samplerate * duration), samplerate=samplerate, channels=1, dtype='int16')
-   sd.wait()
-   return audio.flatten()
 
 def save_audio_to_wav(audio, samplerate=16000):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
@@ -58,35 +61,6 @@ def transcribe_audio(file_path):
     result = whisper_model.transcribe(file_path) 
     return result["text"]
 
-def transcribe_audio2(audio_data, sample_rate=16000):
-    """
-    Convert recorded audio (numpy array) to text using faster-whisper.
-    Lightweight version without SciPy.
-    """
-    tmp_path = None
-    try:
-        # Save to temporary WAV
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_wav:
-            tmp_path = tmp_wav.name
-        with wave.open(tmp_path, "wb") as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(2)
-            wf.setframerate(sample_rate)
-            if audio_data.dtype != np.int16:
-                audio_data = (audio_data * 32767).astype(np.int16)
-            wf.writeframes(audio_data.tobytes())
-
-        # Transcribe with Whisper
-        segments, info = whisper_model.transcribe(tmp_path)
-        text = " ".join([seg.text for seg in segments]).strip()
-        print(f"[STT] {text}")
-        return text or "[unintelligible]"
-    except Exception as e:
-        print(f"[STT ERROR] {e}")
-        return ""
-    finally:
-        if tmp_path and os.path.exists(tmp_path):
-            os.remove(tmp_path)
 
 # Load context from text file
 def load_context():
@@ -208,11 +182,14 @@ def detect_voice(vad, q, sample_rate=16000, frame_size=160, min_speech_ms=250, p
         else:
             speech_start = None  # reset if silence
 
+
 def record_until_silence(vad, q):
     """Record voice until silence detected."""
     frames = []
     silent_frames = 0
     start_time = time.time()
+    print("🔴 Recording... (speak now)")
+    
     while True:
         audio = sd.rec(FRAME_SIZE, samplerate=SAMPLE_RATE, channels=1, dtype="int16")
         sd.wait()
@@ -231,8 +208,13 @@ def record_until_silence(vad, q):
             break
 
     data = np.concatenate(frames, axis=0)
-    # write("last_input.wav", SAMPLE_RATE, data)
     return data
+
+def record_audio(duration=5.0, samplerate=16000):
+    print(f"🔴 Recording for {duration} seconds...")
+    audio = sd.rec(int(samplerate * duration), samplerate=samplerate, channels=1, dtype='int16')
+    sd.wait()
+    return audio.flatten()
 
 def run_session():
     vad = webrtcvad.Vad(3)
@@ -241,21 +223,17 @@ def run_session():
 
     detect_voice(vad, q)
     beep()
-    time.sleep(0.5)
-    print("Recording...")
-    # audio_data = record_until_silence(vad, q)
-
-    # trying old way
-    audio_data = record_audio() 
-
-    # trying old way
-    print("Processing audio...")
-    wav_path = save_audio_to_wav(audio_data) # Call save_audio_to_wav function to save the audio to a WAV file
-    prompt_text = transcribe_audio(wav_path) # Call transcribe_audio function to transcribe the audio file
+    # Short pause to ensure beep doesn't bleed into recording too much, 
+    # though detect_voice already has a pre-beep delay.
+    time.sleep(0.2) 
     
-    # STT placeholder: integrate with Whisper/Vosk later
-    #print("Performing STT...")
-    #prompt_text = transcribe_audio(audio_data, SAMPLE_RATE)
+    # audio_data = record_until_silence(vad, q)
+    audio_data = record_audio()
+
+    print("Processing audio...")
+    wav_path = save_audio_to_wav(audio_data)
+    prompt_text = transcribe_audio(wav_path)
+    
     print(f"Prompt: {prompt_text}")
 
     print("Querying Ollama...")
@@ -270,7 +248,7 @@ if __name__ == "__main__":
         try:
             run_session()
             # restart modules each session to avoid long-run drift
-            time.sleep(2)
+            time.sleep(1)
         except KeyboardInterrupt:
             print("Stopping assistant.")
             break
