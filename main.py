@@ -27,7 +27,8 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='repla
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL_NAME = "qwen2.5:0.5b"
-CONTEXT_FILE = "context.txt"
+# Use absolute path relative to this script
+CONTEXT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "context.txt")
 
 SAMPLE_RATE = 16000
 FRAME_DURATION = 30  # ms
