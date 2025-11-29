@@ -17,6 +17,7 @@ except ImportError:
 import webrtcvad #import webrtcvad library for voice activity detection, 'pip install webrtcvad'
 import json #import json library for ollama_respond
 import queue #import queue library for detect_voice and record_until_silence
+import re #import re library for extract_date
 import sys
 import io
 import logging
@@ -63,59 +64,76 @@ def transcribe_audio(file_path):
     logging.info(f"[STT] {text}")
     return text
 
-
-# Load context from text file
-def load_context():
-    if os.path.exists(CONTEXT_FILE):
-        with open(CONTEXT_FILE, "r", encoding="utf-8") as f:
-            return f.read().strip() 
-    else:
-        return ""
-
-def build_prompt(context: str, user_input: str) -> str:
-    """Construct simplified prompt for small models."""
-    return f"""
-Context:
-{context}
-
-Instructions:
-1. Read the Context above carefully.
-2. Find the menu for the date requested in the Question.
-3. Answer ONLY with the menu items for that specific date.
-4. If the date is not in the Context, say "I don't know."
-5. Do not add any other text.
-
-Question:
-{user_input}
-
-Answer:
-"""
-
-def ollama_respond(user_input: str) -> str:
-    """Send grounded prompt + context to Ollama and return model response."""
-    context = load_context()
-    prompt = build_prompt(context, user_input)
+def parse_menu_context():
+    """Parse context.txt into a dictionary: {'October 1': 'Item 1, Item 2', ...}"""
+    menu_map = {}
+    if not os.path.exists(CONTEXT_FILE):
+        return menu_map
     
-    logging.info(f"[PROMPT] {prompt}")
+    with open(CONTEXT_FILE, "r", encoding="utf-8") as f:
+        content = f.read()
 
-    payload = {"model": MODEL_NAME, "prompt": prompt}
-    try:
-        r = requests.post(OLLAMA_URL, json=payload, stream=True, timeout=60)
-        r.raise_for_status()
-        full_text = ""
-        for line in r.iter_lines():
-            if line:
-                data = json.loads(line.decode("utf-8"))
-                if "response" in data:
-                    full_text += data["response"]
+    # Regex to find blocks like "**October 1 (Wednesday):**" followed by items
+    # Matches: **Month Day (DayOfWeek):**
+    # Then captures everything until the next ** or end of string
+    pattern = re.compile(r"\*\*([A-Za-z]+ \d+) \([A-Za-z]+\):\*\*(.*?)(?=\*\*|$)", re.DOTALL)
+    
+    matches = pattern.findall(content)
+    for date_str, items_block in matches:
+        # Clean up items
+        items = [line.strip().replace("- ", "") for line in items_block.strip().split('\n') if line.strip().startswith("-")]
+        menu_map[date_str.lower()] = ", ".join(items)
         
-        response_text = full_text.strip()
-        logging.info(f"[LLM RESPONSE] {response_text}")
-        return response_text
-    except Exception as e:
-        logging.error(f"[ERROR] Ollama request failed: {e}")
-        print(f"[ERROR] Ollama request failed: {e}")
-        return "Sorry, there was an error contacting the language model."
+    return menu_map
+
+def extract_date(user_input):
+    """Extract date from user input (e.g., 'October 1st' -> 'october 1')."""
+    # Normalize input
+    text = user_input.lower()
+    
+    # Regex for "Month Day" (e.g., october 1, oct 1, october 1st)
+    # \b(january|february|...)\b \d+(st|nd|rd|th)?
+    months = r"(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)"
+    pattern = re.compile(rf"\b{months}\s+(\d+)(?:st|nd|rd|th)?\b")
+    
+    match = pattern.search(text)
+    if match:
+        month = match.group(1)
+        day = match.group(2)
+        
+        # Normalize month names if needed (optional, but context.txt uses full names)
+        # For now, assuming user speaks full month or we match partial.
+        # Let's map short months to full if needed, but context.txt seems to have full names.
+        # Actually, let's just return what we found and rely on loose matching or normalization if needed.
+        # But context.txt has "October", so "oct" needs to be mapped.
+        
+        full_months = {
+            "jan": "january", "feb": "february", "mar": "march", "apr": "april",
+            "jun": "june", "jul": "july", "aug": "august", "sep": "september",
+            "oct": "october", "nov": "november", "dec": "december"
+        }
+        if month in full_months:
+            month = full_months[month]
+            
+        return f"{month} {day}"
+    return None
+
+def lookup_menu(user_input):
+    """Look up menu deterministically."""
+    date_key = extract_date(user_input)
+    
+    if not date_key:
+        return "Please specify a date, for example, October 1st."
+        
+    menu_map = parse_menu_context()
+    
+    # Try exact match
+    if date_key in menu_map:
+        return f"The menu for {date_key.title()} is: {menu_map[date_key]}."
+        
+    return f"I couldn't find a menu for {date_key.title()}."
+
+# Removed ollama_respond and build_prompt as they are no longer needed.
 
 def tts_speak(text: str):
     """Speak text using pyttsx3."""
@@ -225,9 +243,9 @@ def run_session():
         logging.info("[STT] Empty input, skipping.")
         return
 
-    print("Querying Ollama...")
-    answer = ollama_respond(prompt_text)
-    print(f"Ollama response: {answer}")
+    print("Querying Menu...")
+    answer = lookup_menu(prompt_text)
+    print(f"Response: {answer}")
     tts_speak(answer)
     print("Done. Ready for next query.\n")
 
