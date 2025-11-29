@@ -233,6 +233,7 @@ def run_session():
 
 if __name__ == "__main__":
     print("VoiceChat assistant running.")
+    tts_speak("Voice chat assistant is now running.")
     while True:
         try:
             run_session()
