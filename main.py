@@ -73,41 +73,17 @@ def load_context():
         return ""
 
 def build_prompt(context: str, user_input: str) -> str:
-    """Construct strict, literal prompt to avoid hallucination."""
+    """Construct simplified prompt for small models."""
     return f"""
-You are a strict, literal assistant. You must answer **only** using the information explicitly listed in the context below.
-If the requested date or menu is not present, reply exactly with: "I don't know."
-Do not guess, infer, or make assumptions.
-Do not reformat, rephrase, or add any commentary.
-List the menu items exactly as they appear in the context, separated by commas.
-
-Example:
 Context:
-----------
-**August 1 (Friday):**
-- BBQ Chicken Sandwich  
-- Coleslaw  
-- Orange  
-
-**August 4 (Monday):**
-- Chicken Florentine  
-- Pasta  
-- Spinach  
-- Apple  
-----------
-
-Question:
-What is the menu for August 1st?
-Answer:
-BBQ Chicken Sandwich, Coleslaw, Orange
-
-----------
-
-Now your turn:
-Context:
-----------
 {context}
-----------
+
+Instructions:
+1. Read the Context above carefully.
+2. Find the menu for the date requested in the Question.
+3. Answer ONLY with the menu items for that specific date.
+4. If the date is not in the Context, say "I don't know."
+5. Do not add any other text.
 
 Question:
 {user_input}
