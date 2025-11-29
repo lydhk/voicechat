@@ -68,8 +68,10 @@ def parse_menu_context():
     """Parse context.txt into a dictionary: {'October 1': 'Item 1, Item 2', ...}"""
     menu_map = {}
     if not os.path.exists(CONTEXT_FILE):
+        logging.warning(f"Context file not found: {os.path.abspath(CONTEXT_FILE)}")
         return menu_map
     
+    logging.info(f"Reading context file: {os.path.abspath(CONTEXT_FILE)}")
     with open(CONTEXT_FILE, "r", encoding="utf-8") as f:
         content = f.read()
 
@@ -84,6 +86,7 @@ def parse_menu_context():
         items = [line.strip().replace("- ", "") for line in items_block.strip().split('\n') if line.strip().startswith("-")]
         menu_map[date_str.lower()] = ", ".join(items)
         
+    logging.info(f"Loaded {len(menu_map)} menu items.")
     return menu_map
 
 def extract_date(user_input):
